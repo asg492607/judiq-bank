@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JudiQ Bank Edition | Litigation & Recovery</title>
-    <link rel="icon" href="data:,">
+    <title>JudiQ Bank Edition | Litigation & Recovery OS</title>
+    <meta name="description" content="JudiQ Bank Edition — Enterprise AI-powered Legal Recovery and Litigation Management Platform for Banking Institutions.">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,14 +32,14 @@
             <form id="loginForm" style="display: block;">
                 <div class="form-group">
                     <label>Username</label>
-                    <input type="text" id="username" class="form-control" placeholder="Enter 'admin'" required>
+                    <input type="text" id="username" class="form-control" placeholder="Default: admin" required autocomplete="username">
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="margin-top: 16px;">
                     <label>Password</label>
-                    <input type="password" id="password" class="form-control" placeholder="Enter 'password'" required>
+                    <input type="password" id="password" class="form-control" placeholder="Default: password" required autocomplete="current-password">
                 </div>
-                <div id="loginError" class="error-msg" style="display:none; color:#ef4444; margin-bottom:10px;">Invalid credentials</div>
-                <button type="submit" class="btn btn-primary">Sign In to Dashboard</button>
+                <div id="loginError" class="error-msg" style="display:none;"></div>
+                <button type="submit" class="btn btn-primary" id="loginBtn">Sign In to Dashboard</button>
                 <div style="text-align: center; margin-top: 16px;">
                     <a href="#" onclick="toggleAuth('register')" style="color: var(--primary-color); text-decoration: none; font-size: 0.9rem;">New Officer? Register Here</a>
                 </div>
@@ -47,18 +48,18 @@
             <form id="registerForm" style="display: none;">
                 <div class="form-group">
                     <label>Full Name</label>
-                    <input type="text" id="regName" class="form-control" placeholder="e.g. John Doe" required>
+                    <input type="text" id="regName" class="form-control" placeholder="e.g. Priya Sharma" required>
                 </div>
                 <div class="form-group" style="margin-top: 16px;">
-                    <label>Email Address / Username</label>
-                    <input type="text" id="regEmail" class="form-control" placeholder="e.g. admin2" required>
+                    <label>Username</label>
+                    <input type="text" id="regEmail" class="form-control" placeholder="e.g. priya.sharma" required>
                 </div>
                 <div class="form-group" style="margin-top: 16px;">
                     <label>Password</label>
-                    <input type="password" id="regPassword" class="form-control" placeholder="••••••••" required>
+                    <input type="password" id="regPassword" class="form-control" placeholder="Min. 6 characters" required autocomplete="new-password">
                 </div>
-                <div id="regError" class="error-msg" style="display:none; color:#ef4444; margin-bottom:10px;">Registration failed</div>
-                <button type="submit" class="btn btn-primary" style="margin-top: 24px;">Create Account</button>
+                <div id="regError" class="error-msg" style="display:none;"></div>
+                <button type="submit" class="btn btn-primary" id="regBtn" style="margin-top: 24px;">Create Account</button>
                 <div style="text-align: center; margin-top: 16px;">
                     <a href="#" onclick="toggleAuth('login')" style="color: var(--primary-color); text-decoration: none; font-size: 0.9rem;">Already have an account? Login</a>
                 </div>
@@ -66,6 +67,7 @@
         </div>
     </div>
     
+    <!-- Main App Container -->
     <div id="appContainer" class="app-container" style="display: none;">
         
         <!-- Sidebar Navigation -->
@@ -80,8 +82,12 @@
                 <a href="#" class="nav-item active" data-view="dashboard">
                     <i class="fas fa-chart-pie"></i> Executive Dashboard
                 </a>
-                <a href="#" class="nav-item" data-view="case-intake"><i class="fas fa-file-import"></i> Case Intake</a>
-                <a href="#" class="nav-item" data-view="notices"><i class="fas fa-envelope-open-text"></i> Legal Notices</a>
+                <a href="#" class="nav-item" data-view="case-intake">
+                    <i class="fas fa-file-import"></i> Case Intake
+                </a>
+                <a href="#" class="nav-item" data-view="notices">
+                    <i class="fas fa-envelope-open-text"></i> Legal Notices
+                </a>
                 
                 <div class="nav-group-title">Recovery & Litigation</div>
                 <a href="#" class="nav-item" data-view="recovery">
@@ -107,12 +113,15 @@
             
             <div class="sidebar-footer">
                 <div class="user-profile">
-                    <div class="user-avatar">AD</div>
+                    <div class="user-avatar" id="sidebarAvatar">AD</div>
                     <div class="user-info">
-                        <span class="user-name">Admin User</span>
-                        <span class="user-role">Recovery Head</span>
+                        <span class="user-name" id="sidebarUserName">Admin User</span>
+                        <span class="user-role" id="sidebarUserRole">Recovery Head</span>
                     </div>
                 </div>
+                <button class="btn btn-outline btn-sm logout-btn" id="logoutBtn" onclick="handleLogout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
             </div>
         </aside>
         
@@ -121,27 +130,39 @@
             
             <!-- Topbar -->
             <header class="topbar">
-                <div class="search-bar">
+                <div class="search-bar" id="searchBarContainer">
                     <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Search cases, borrowers, or legal provisions... (AI Copilot)">
+                    <input type="text" id="globalSearchInput" placeholder="Search cases, borrowers, or legal provisions... (AI Copilot)" autocomplete="off">
+                    <div id="searchDropdown" class="search-dropdown hidden"></div>
                 </div>
                 <div class="topbar-actions">
-                    <button class="icon-btn" title="Notifications">
+                    <button class="icon-btn" title="Notifications" id="notifBellBtn" onclick="toggleNotifPanel()">
                         <i class="fas fa-bell"></i>
-                        <span class="badge">3</span>
+                        <span class="badge" id="notifBadge">0</span>
                     </button>
-                    <button class="icon-btn" title="Generate Report">
+                    <button class="icon-btn" title="Export Report" id="exportReportBtn" onclick="exportReport()">
                         <i class="fas fa-file-export"></i>
                     </button>
                 </div>
             </header>
+
+            <!-- Notification Panel -->
+            <div id="notifPanel" class="notif-panel hidden premium-glass">
+                <div class="notif-header">
+                    <h4><i class="fas fa-bell"></i> Notifications</h4>
+                    <button class="btn btn-sm btn-outline" onclick="markAllRead()">Mark All Read</button>
+                </div>
+                <div id="notifList" class="notif-list">
+                    <div class="notif-loading">Loading...</div>
+                </div>
+            </div>
             
             <!-- Dynamic View Container -->
             <div id="viewContainer" class="view-container">
-                
 
-                
-                <!-- View: Executive Dashboard -->
+                <!-- ═══════════════════════════════════ -->
+                <!-- View: Executive Dashboard           -->
+                <!-- ═══════════════════════════════════ -->
                 <div id="view-dashboard" class="view-pane active">
                     <div class="view-header">
                         <div>
@@ -149,10 +170,10 @@
                             <p class="subtitle">Live portfolio analytics and AI risk overview</p>
                         </div>
                         <div class="date-filter">
-                            <select>
-                                <option>Last 30 Days</option>
-                                <option>This Quarter</option>
-                                <option>Year to Date</option>
+                            <select id="dashboardDateFilter" onchange="fetchDashboardData()">
+                                <option value="30">Last 30 Days</option>
+                                <option value="90">This Quarter</option>
+                                <option value="365">Year to Date</option>
                             </select>
                         </div>
                     </div>
@@ -163,7 +184,7 @@
                             <div class="kpi-icon recovery-icon"><i class="fas fa-rupee-sign"></i></div>
                             <div class="kpi-content">
                                 <h3>Total NPA Exposure</h3>
-                                <div class="kpi-value" id="kpi-exposure">₹4,250 Cr</div>
+                                <div class="kpi-value" id="kpi-exposure">Loading...</div>
                                 <div class="kpi-trend positive"><i class="fas fa-arrow-down"></i> 2.4% vs last month</div>
                             </div>
                         </div>
@@ -171,7 +192,7 @@
                             <div class="kpi-icon case-icon"><i class="fas fa-gavel"></i></div>
                             <div class="kpi-content">
                                 <h3>Active Litigation Cases</h3>
-                                <div class="kpi-value" id="kpi-cases">12,405</div>
+                                <div class="kpi-value" id="kpi-cases">Loading...</div>
                                 <div class="kpi-trend negative"><i class="fas fa-arrow-up"></i> 1.2% vs last month</div>
                             </div>
                         </div>
@@ -179,7 +200,7 @@
                             <div class="kpi-icon compliance-icon"><i class="fas fa-check-circle"></i></div>
                             <div class="kpi-content">
                                 <h3>Compliance Score</h3>
-                                <div class="kpi-value" id="kpi-score">98.5%</div>
+                                <div class="kpi-value" id="kpi-score">Loading...</div>
                                 <div class="kpi-trend positive"><i class="fas fa-arrow-up"></i> 0.5% vs last month</div>
                             </div>
                         </div>
@@ -187,7 +208,7 @@
                             <div class="kpi-icon recovery-rate-icon"><i class="fas fa-chart-line"></i></div>
                             <div class="kpi-content">
                                 <h3>AI Predicted Recovery</h3>
-                                <div class="kpi-value" id="kpi-predicted">₹1,120 Cr</div>
+                                <div class="kpi-value" id="kpi-predicted">Loading...</div>
                                 <div class="kpi-trend neutral"><i class="fas fa-minus"></i> Stable</div>
                             </div>
                         </div>
@@ -209,15 +230,15 @@
                         </div>
                     </div>
                     
-                    <!-- Recent AI Insights -->
+                    <!-- AI Insights -->
                     <div class="insights-section premium-glass">
                         <h3><i class="fas fa-bolt highlight"></i> AI Copilot Insights</h3>
-                        <div class="insight-list">
+                        <div class="insight-list" id="dashboardInsights">
                             <div class="insight-item">
                                 <div class="insight-icon alert"><i class="fas fa-exclamation-triangle"></i></div>
                                 <div>
                                     <h4>Limitation Risk Detected</h4>
-                                    <p>14 cases in the West region are approaching their limitation period within 30 days. <a href="#">Review immediately.</a></p>
+                                    <p>14 cases in the West region are approaching their limitation period within 30 days. <a href="#" onclick="navigateTo('litigation')">Review immediately.</a></p>
                                 </div>
                             </div>
                             <div class="insight-item">
@@ -230,8 +251,10 @@
                         </div>
                     </div>
                 </div>
-                
-                <!-- View: Case Intake -->
+
+                <!-- ═══════════════════════════════════ -->
+                <!-- View: Case Intake                   -->
+                <!-- ═══════════════════════════════════ -->
                 <div id="view-case-intake" class="view-pane hidden">
                     <div class="view-header">
                         <div>
@@ -248,19 +271,29 @@
                                 <i class="fas fa-cloud-upload-alt fa-3x"></i>
                                 <p>Drag and drop case files here</p>
                                 <span class="text-sm text-muted">Supports PDF, CSV, ZIP (Max 50MB)</span>
-                                <input type="file" id="fileInput" multiple hidden>
+                                <input type="file" id="fileInput" multiple hidden accept=".pdf,.csv,.zip,.txt,.docx">
                                 <button class="btn btn-outline" onclick="document.getElementById('fileInput').click()">Browse Files</button>
                             </div>
                             
                             <div id="uploadProgress" class="upload-progress hidden">
                                 <div class="progress-info">
-                                    <span id="uploadFilename">Processing loan_doc_452.pdf...</span>
-                                    <span id="uploadPercent">64%</span>
+                                    <span id="uploadFilename">Processing document...</span>
+                                    <span id="uploadPercent">0%</span>
                                 </div>
                                 <div class="progress-bar">
                                     <div class="progress-fill" id="progressFill"></div>
                                 </div>
                                 <p class="text-xs text-muted mt-2"><i class="fas fa-spinner fa-spin"></i> Running AI OCR & Categorization Engine</p>
+                            </div>
+
+                            <div id="uploadResult" class="upload-result hidden">
+                                <div class="result-success">
+                                    <i class="fas fa-check-circle"></i>
+                                    <div>
+                                        <strong id="uploadResultCaseId"></strong>
+                                        <p id="uploadResultDetail"></p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -268,7 +301,9 @@
                         <div class="queue-section premium-glass">
                             <div class="section-header-flex">
                                 <h3>Recent Intake Queue</h3>
-                                <button class="btn btn-sm btn-outline"><i class="fas fa-sync"></i> Refresh</button>
+                                <button class="btn btn-sm btn-outline" id="refreshCasesBtn" onclick="fetchRecentCases()">
+                                    <i class="fas fa-sync"></i> Refresh
+                                </button>
                             </div>
                             
                             <div class="table-container">
@@ -283,7 +318,6 @@
                                         </tr>
                                     </thead>
                                     <tbody id="recentCasesBody">
-                                        <!-- Populated via JS -->
                                         <tr><td colspan="5" style="text-align: center; padding: 20px;">Loading cases...</td></tr>
                                     </tbody>
                                 </table>
@@ -291,123 +325,239 @@
                         </div>
                     </div>
                 </div>
-                
-                <!-- View: Recovery -->
+
+                <!-- ═══════════════════════════════════ -->
+                <!-- View: Recovery Cases               -->
+                <!-- ═══════════════════════════════════ -->
                 <div id="view-recovery" class="view-pane hidden">
-                <div class="view-header">
-                    <div>
-                        <h1>Recovery Workflows</h1>
-                        <p class="subtitle">Module 4: Manage, assign, and track legal recovery lifecycle</p>
-                    </div>
-                    <div class="topbar-actions">
-                        <button class="btn btn-outline" style="margin-right: 12px;"><i class="fas fa-filter"></i> Filters</button>
-                        <button class="btn btn-primary"><i class="fas fa-plus"></i> New Strategy</button>
-                    </div>
-                </div>
-
-                <div class="kpi-grid">
-                    <div class="kpi-card premium-glass">
-                        <div class="kpi-icon recovery-icon"><i class="fas fa-gavel"></i></div>
-                        <div class="kpi-content">
-                            <h3>Active Legal Recovery</h3>
-                            <div class="kpi-value">142 Cases</div>
-                            <div class="kpi-trend positive"><i class="fas fa-arrow-up"></i> DRT & SARFAESI</div>
-                        </div>
-                    </div>
-                    <div class="kpi-card premium-glass">
-                        <div class="kpi-icon case-icon"><i class="fas fa-handshake"></i></div>
-                        <div class="kpi-content">
-                            <h3>Settlement Pipeline</h3>
-                            <div class="kpi-value">₹84.5 Cr</div>
-                            <div class="kpi-trend neutral"><i class="fas fa-minus"></i> 34 Proposals</div>
-                        </div>
-                    </div>
-                    <div class="kpi-card premium-glass">
-                        <div class="kpi-icon compliance-icon"><i class="fas fa-user-tie"></i></div>
-                        <div class="kpi-content">
-                            <h3>Unassigned Cases</h3>
-                            <div class="kpi-value">12 Cases</div>
-                            <div class="kpi-trend negative"><i class="fas fa-exclamation-circle"></i> Requires Action</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="queue-section premium-glass">
-                    <div class="section-header-flex">
-                        <h3>Recovery Case Queue</h3>
+                    <div class="view-header">
                         <div>
-                            <button class="btn btn-sm btn-outline active">All Active</button>
-                            <button class="btn btn-sm btn-outline">Pending Assignment</button>
+                            <h1>Recovery Workflows</h1>
+                            <p class="subtitle">Manage, assign, and track legal recovery lifecycle</p>
+                        </div>
+                        <div class="topbar-actions">
+                            <button class="btn btn-outline" style="margin-right: 12px;" onclick="filterRecovery('unassigned')"><i class="fas fa-user-slash"></i> Unassigned</button>
+                            <button class="btn btn-outline" style="margin-right: 12px;" onclick="filterRecovery('all')"><i class="fas fa-list"></i> All Cases</button>
                         </div>
                     </div>
-                    <div class="table-container">
-                        <table class="enterprise-table">
-                            <thead>
-                                <tr>
-                                    <th>Case ID</th>
-                                    <th>Borrower / Entity</th>
-                                    <th>Exposure</th>
-                                    <th>Strategy</th>
-                                    <th>Status</th>
-                                    <th>Advocate</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="recoveryCasesBody">
-                                <!-- Dynamically populated by app.js -->
-                                <tr><td colspan="7" style="text-align:center;">Loading cases...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            <!-- View: Risk & Compliance -->
-            <div id="view-risk" class="view-pane hidden">
-                <div class="view-header">
-                    <div>
-                        <h1>AI Risk Scoring Engine</h1>
-                        <p class="subtitle">Module 12: Predict and manage portfolio risk proactively</p>
-                    </div>
-                    <div class="topbar-actions">
-                        <button class="btn btn-outline" style="margin-right: 12px;"><i class="fas fa-download"></i> Export Report</button>
-                        <button class="btn btn-primary"><i class="fas fa-sync"></i> Run Risk Model</button>
-                    </div>
-                </div>
 
-                <div class="kpi-grid">
-                    <div class="kpi-card premium-glass">
-                        <div class="kpi-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;"><i class="fas fa-exclamation-triangle"></i></div>
-                        <div class="kpi-content">
-                            <h3>High-Risk Accounts</h3>
-                            <div class="kpi-value" id="kpi-high-risk">--</div>
-                            <div class="kpi-trend negative"><i class="fas fa-arrow-up"></i> Needs Attention</div>
+                    <div class="kpi-grid">
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon recovery-icon"><i class="fas fa-gavel"></i></div>
+                            <div class="kpi-content">
+                                <h3>Active Legal Recovery</h3>
+                                <div class="kpi-value" id="rec-kpi-total">--</div>
+                                <div class="kpi-trend positive"><i class="fas fa-arrow-up"></i> DRT & SARFAESI</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon case-icon"><i class="fas fa-handshake"></i></div>
+                            <div class="kpi-content">
+                                <h3>Settlement Pipeline</h3>
+                                <div class="kpi-value" id="rec-kpi-settlement">₹84.5 Cr</div>
+                                <div class="kpi-trend neutral"><i class="fas fa-minus"></i> 34 Proposals</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;"><i class="fas fa-user-tie"></i></div>
+                            <div class="kpi-content">
+                                <h3>Unassigned Cases</h3>
+                                <div class="kpi-value" id="rec-kpi-unassigned">--</div>
+                                <div class="kpi-trend negative"><i class="fas fa-exclamation-circle"></i> Requires Action</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="kpi-card premium-glass">
-                        <div class="kpi-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;"><i class="fas fa-broadcast-tower"></i></div>
-                        <div class="kpi-content">
-                            <h3>EWS Alerts Triggered</h3>
-                            <div class="kpi-value" id="kpi-ews">--</div>
-                            <div class="kpi-trend neutral"><i class="fas fa-minus"></i> Early Warning Signals</div>
+
+                    <div class="queue-section premium-glass">
+                        <div class="section-header-flex">
+                            <h3>Recovery Case Queue</h3>
+                            <button class="btn btn-sm btn-outline" onclick="fetchRecoveryCases()"><i class="fas fa-sync"></i> Refresh</button>
                         </div>
-                    </div>
-                    <div class="kpi-card premium-glass">
-                        <div class="kpi-icon compliance-icon"><i class="fas fa-shield-alt"></i></div>
-                        <div class="kpi-content">
-                            <h3>Avg Portfolio Risk Score</h3>
-                            <div class="kpi-value" id="kpi-avg-risk">--</div>
-                            <div class="kpi-trend positive"><i class="fas fa-check"></i> Acceptable Range</div>
+                        <div class="table-container">
+                            <table class="enterprise-table">
+                                <thead>
+                                    <tr>
+                                        <th>Case ID</th>
+                                        <th>Borrower / Entity</th>
+                                        <th>Exposure</th>
+                                        <th>Strategy</th>
+                                        <th>Status</th>
+                                        <th>Advocate</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recoveryCasesBody">
+                                    <tr><td colspan="7" style="text-align:center; padding:20px;">Loading cases...</td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
 
-                <div class="charts-grid">
-                    <div class="chart-card premium-glass">
-                        <h3>Detailed Risk Matrix</h3>
-                        <div class="chart-container">
-                            <canvas id="detailedRiskChart"></canvas>
+                <!-- ═══════════════════════════════════ -->
+                <!-- View: Litigation Command            -->
+                <!-- ═══════════════════════════════════ -->
+                <div id="view-litigation" class="view-pane hidden">
+                    <div class="view-header">
+                        <div>
+                            <h1>Litigation Command</h1>
+                            <p class="subtitle">Court proceedings, hearings, and legal strategy management</p>
+                        </div>
+                        <div class="topbar-actions">
+                            <button class="btn btn-outline" style="margin-right: 12px;" onclick="exportReport()"><i class="fas fa-download"></i> Export</button>
+                            <button class="btn btn-primary" onclick="openUpdateHearingModal()"><i class="fas fa-calendar-plus"></i> Update Hearing</button>
                         </div>
                     </div>
-                    <div class="insights-section premium-glass">
+
+                    <div class="kpi-grid">
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon case-icon"><i class="fas fa-balance-scale"></i></div>
+                            <div class="kpi-content">
+                                <h3>Total Litigation Cases</h3>
+                                <div class="kpi-value" id="lit-kpi-total">--</div>
+                                <div class="kpi-trend negative"><i class="fas fa-arrow-up"></i> Active Court Matters</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon recovery-icon"><i class="fas fa-rupee-sign"></i></div>
+                            <div class="kpi-content">
+                                <h3>Litigation Exposure</h3>
+                                <div class="kpi-value" id="lit-kpi-exposure">--</div>
+                                <div class="kpi-trend neutral"><i class="fas fa-minus"></i> Total at Stake</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon compliance-icon"><i class="fas fa-calendar-day"></i></div>
+                            <div class="kpi-content">
+                                <h3>Upcoming Hearings</h3>
+                                <div class="kpi-value" id="lit-kpi-hearings">--</div>
+                                <div class="kpi-trend positive"><i class="fas fa-check"></i> Scheduled</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;"><i class="fas fa-user-slash"></i></div>
+                            <div class="kpi-content">
+                                <h3>Unassigned Matters</h3>
+                                <div class="kpi-value" id="lit-kpi-unassigned">--</div>
+                                <div class="kpi-trend negative"><i class="fas fa-exclamation"></i> Needs Advocate</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="queue-section premium-glass">
+                        <div class="section-header-flex">
+                            <h3>Active Court Matters</h3>
+                            <button class="btn btn-sm btn-outline" onclick="fetchLitigationCases()"><i class="fas fa-sync"></i> Refresh</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="enterprise-table">
+                                <thead>
+                                    <tr>
+                                        <th>Case ID</th>
+                                        <th>Borrower</th>
+                                        <th>Exposure</th>
+                                        <th>Court</th>
+                                        <th>Case Type</th>
+                                        <th>Status</th>
+                                        <th>Next Hearing</th>
+                                        <th>Advocate</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="litigationCasesBody">
+                                    <tr><td colspan="9" style="text-align:center; padding:20px;">Loading litigation cases...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══════════════════════════════════ -->
+                <!-- View: AI Risk Scoring              -->
+                <!-- ═══════════════════════════════════ -->
+                <div id="view-risk-scoring" class="view-pane hidden">
+                    <div class="view-header">
+                        <div>
+                            <h1>AI Risk Scoring Engine</h1>
+                            <p class="subtitle">Predict and manage portfolio risk proactively</p>
+                        </div>
+                        <div class="topbar-actions">
+                            <button class="btn btn-outline" style="margin-right: 12px;" onclick="exportReport()"><i class="fas fa-download"></i> Export Report</button>
+                            <button class="btn btn-primary" onclick="fetchRiskData()"><i class="fas fa-sync"></i> Run Risk Model</button>
+                        </div>
+                    </div>
+
+                    <div class="kpi-grid">
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;"><i class="fas fa-exclamation-triangle"></i></div>
+                            <div class="kpi-content">
+                                <h3>High-Risk Accounts</h3>
+                                <div class="kpi-value" id="kpi-high-risk">--</div>
+                                <div class="kpi-trend negative"><i class="fas fa-arrow-up"></i> Needs Attention</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;"><i class="fas fa-broadcast-tower"></i></div>
+                            <div class="kpi-content">
+                                <h3>EWS Alerts Triggered</h3>
+                                <div class="kpi-value" id="kpi-ews">--</div>
+                                <div class="kpi-trend neutral"><i class="fas fa-minus"></i> Early Warning Signals</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon compliance-icon"><i class="fas fa-shield-alt"></i></div>
+                            <div class="kpi-content">
+                                <h3>Avg Portfolio Risk Score</h3>
+                                <div class="kpi-value" id="kpi-avg-risk">--</div>
+                                <div class="kpi-trend positive"><i class="fas fa-check"></i> Acceptable Range</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Score Calculator + Chart -->
+                    <div class="charts-grid" style="grid-template-columns: 1fr 1fr;">
+                        <div class="chart-card premium-glass">
+                            <h3>Portfolio Risk Matrix (Exposure in Cr)</h3>
+                            <div class="chart-container">
+                                <canvas id="detailedRiskChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="upload-section premium-glass" style="padding: 24px;">
+                            <h3 style="margin-bottom: 16px;">AI Score a Borrower</h3>
+                            <form id="scoringForm">
+                                <div class="form-group">
+                                    <label>Case ID</label>
+                                    <input type="text" class="form-control" id="scoreCase" placeholder="e.g. REC-2023-001" required>
+                                </div>
+                                <div class="form-group" style="margin-top: 12px;">
+                                    <label>Borrower Name</label>
+                                    <input type="text" class="form-control" id="scoreBorrower" placeholder="e.g. Omega Textiles" required>
+                                </div>
+                                <div class="form-group" style="margin-top: 12px;">
+                                    <label>Exposure (in Lakhs)</label>
+                                    <input type="number" class="form-control" id="scoreExposure" placeholder="e.g. 845" required>
+                                </div>
+                                <div class="form-group" style="margin-top: 12px;">
+                                    <label>Days Past Due (DPD)</label>
+                                    <input type="number" class="form-control" id="scoreDPD" placeholder="e.g. 120" required>
+                                </div>
+                                <div class="form-group" style="margin-top: 12px;">
+                                    <label>Sector</label>
+                                    <select class="form-control" id="scoreSector">
+                                        <option>Real Estate</option>
+                                        <option>Manufacturing</option>
+                                        <option>Retail</option>
+                                        <option>Infrastructure</option>
+                                        <option>MSME</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 20px;"><i class="fas fa-robot"></i> Calculate Risk Score</button>
+                            </form>
+                            <div id="scoreResult" class="score-result hidden"></div>
+                        </div>
+                    </div>
+
+                    <div class="insights-section premium-glass" style="margin-top: 24px;">
                         <h3>AI Risk Insights</h3>
                         <div class="insight-list">
                             <div class="insight-item">
@@ -426,136 +576,505 @@
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="queue-section premium-glass">
-                    <div class="section-header-flex">
-                        <h3>High-Risk Watchlist</h3>
-                    </div>
-                    <div class="table-container">
-                        <table class="enterprise-table">
-                            <thead>
-                                <tr>
-                                    <th>Account / Borrower</th>
-                                    <th>Exposure</th>
-                                    <th>Risk Score</th>
-                                    <th>Primary Risk Factor</th>
-                                    <th>AI Recommendation</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="highRiskCasesBody">
-                                <tr><td colspan="6" style="text-align:center;">Loading high risk cases...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- View: Legal Notices -->
-            <div id="view-notices" class="view-pane hidden">
-                <div class="view-header">
-                    <div>
-                        <h1>Legal Notice Intelligence</h1>
-                        <p class="subtitle">Module 3: AI-drafted statutory notices and dispatch tracking</p>
-                    </div>
-                </div>
-
-                <div class="kpi-grid">
-                    <div class="kpi-card premium-glass">
-                        <div class="kpi-icon case-icon"><i class="fas fa-file-signature"></i></div>
-                        <div class="kpi-content">
-                            <h3>Notices Drafted</h3>
-                            <div class="kpi-value">84</div>
-                            <div class="kpi-trend positive"><i class="fas fa-arrow-up"></i> This Month</div>
-                        </div>
-                    </div>
-                    <div class="kpi-card premium-glass">
-                        <div class="kpi-icon compliance-icon"><i class="fas fa-shipping-fast"></i></div>
-                        <div class="kpi-content">
-                            <h3>Notices Served</h3>
-                            <div class="kpi-value">62</div>
-                            <div class="kpi-trend positive"><i class="fas fa-check"></i> Acknowledged</div>
-                        </div>
-                    </div>
-                    <div class="kpi-card premium-glass">
-                        <div class="kpi-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;"><i class="fas fa-clock"></i></div>
-                        <div class="kpi-content">
-                            <h3>Deadlines Approaching</h3>
-                            <div class="kpi-value">7</div>
-                            <div class="kpi-trend negative"><i class="fas fa-exclamation-triangle"></i> Reply Window Closing</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="intake-grid">
-                    <div class="upload-section premium-glass">
-                        <h3>AI Notice Generator</h3>
-                        <p class="text-sm text-muted" style="margin-bottom: 20px;">Select a case to auto-generate statutory notices.</p>
-                        
-                        <form id="noticeGeneratorForm">
-                            <div class="form-group">
-                                <label>Target Case ID / Borrower</label>
-                                <select class="form-control" id="noticeCaseId">
-                                    <option value="REC-2023-001">Omega Textiles</option>
-                                    <option value="REC-2023-004">Epsilon Retail</option>
-                                    <option value="LIT-2023-0891">Alpha Industries Ltd.</option>
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin-top: 16px;">
-                                <label>Notice Type</label>
-                                <select class="form-control" id="noticeType">
-                                    <option value="SARFAESI_13_2">SARFAESI Section 13(2) Demand</option>
-                                    <option value="NI_138">Section 138 NI Act (Cheque Bounce)</option>
-                                    <option value="ARBITRATION">Arbitration Invocation</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 24px;"><i class="fas fa-magic"></i> Generate Draft</button>
-                        </form>
-                    </div>
-
-                    <div class="queue-section premium-glass">
+                    <div class="queue-section premium-glass" style="margin-top: 24px;">
                         <div class="section-header-flex">
-                            <h3>Notice Dispatch Tracking</h3>
+                            <h3>High-Risk Watchlist</h3>
+                            <button class="btn btn-sm btn-outline" onclick="fetchRiskData()"><i class="fas fa-sync"></i> Refresh</button>
                         </div>
                         <div class="table-container">
                             <table class="enterprise-table">
                                 <thead>
                                     <tr>
-                                        <th>Notice ID</th>
-                                        <th>Borrower</th>
-                                        <th>Type</th>
-                                        <th>Dispatch Status</th>
-                                        <th>Deadline</th>
+                                        <th>Account / Borrower</th>
+                                        <th>Exposure</th>
+                                        <th>Risk Score</th>
+                                        <th>Primary Risk Factor</th>
+                                        <th>AI Recommendation</th>
                                         <th>Action</th>
                                     </tr>
                                 </thead>
-                                <tbody id="noticesTrackingBody">
-                                    <tr><td colspan="6" style="text-align:center;">Loading tracking data...</td></tr>
+                                <tbody id="highRiskCasesBody">
+                                    <tr><td colspan="6" style="text-align:center; padding:20px;">Loading high risk cases...</td></tr>
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            </div>
-        </main>
-    </div>
 
-    <!-- Modal Overlay -->
+                <!-- ═══════════════════════════════════ -->
+                <!-- View: Legal Notices                -->
+                <!-- ═══════════════════════════════════ -->
+                <div id="view-notices" class="view-pane hidden">
+                    <div class="view-header">
+                        <div>
+                            <h1>Legal Notice Intelligence</h1>
+                            <p class="subtitle">AI-drafted statutory notices and dispatch tracking</p>
+                        </div>
+                    </div>
+
+                    <div class="kpi-grid">
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon case-icon"><i class="fas fa-file-signature"></i></div>
+                            <div class="kpi-content">
+                                <h3>Notices Drafted</h3>
+                                <div class="kpi-value" id="notice-kpi-drafted">--</div>
+                                <div class="kpi-trend positive"><i class="fas fa-arrow-up"></i> This Month</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon compliance-icon"><i class="fas fa-shipping-fast"></i></div>
+                            <div class="kpi-content">
+                                <h3>Notices Served</h3>
+                                <div class="kpi-value" id="notice-kpi-served">--</div>
+                                <div class="kpi-trend positive"><i class="fas fa-check"></i> Acknowledged</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;"><i class="fas fa-clock"></i></div>
+                            <div class="kpi-content">
+                                <h3>Deadlines Approaching</h3>
+                                <div class="kpi-value" id="notice-kpi-deadline">--</div>
+                                <div class="kpi-trend negative"><i class="fas fa-exclamation-triangle"></i> Reply Window Closing</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="intake-grid">
+                        <div class="upload-section premium-glass">
+                            <h3>AI Notice Generator</h3>
+                            <p class="text-sm text-muted" style="margin-bottom: 20px;">Select a case to auto-generate statutory notices.</p>
+                            
+                            <form id="noticeGeneratorForm">
+                                <div class="form-group">
+                                    <label>Target Case ID / Borrower</label>
+                                    <select class="form-control" id="noticeCaseId">
+                                        <option value="REC-2023-001">Omega Textiles</option>
+                                        <option value="REC-2023-004">Epsilon Retail</option>
+                                        <option value="LIT-2023-0891">Alpha Industries Ltd.</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="margin-top: 16px;">
+                                    <label>Notice Type</label>
+                                    <select class="form-control" id="noticeType">
+                                        <option value="SARFAESI_13_2">SARFAESI Section 13(2) Demand</option>
+                                        <option value="NI_138">Section 138 NI Act (Cheque Bounce)</option>
+                                        <option value="ARBITRATION">Arbitration Invocation</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary" id="generateNoticeBtn" style="width: 100%; margin-top: 24px;"><i class="fas fa-magic"></i> Generate Draft</button>
+                            </form>
+                        </div>
+
+                        <div class="queue-section premium-glass">
+                            <div class="section-header-flex">
+                                <h3>Notice Dispatch Tracking</h3>
+                                <button class="btn btn-sm btn-outline" onclick="fetchNotices()"><i class="fas fa-sync"></i> Refresh</button>
+                            </div>
+                            <div class="table-container">
+                                <table class="enterprise-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Notice ID</th>
+                                            <th>Borrower</th>
+                                            <th>Type</th>
+                                            <th>Dispatch Status</th>
+                                            <th>Deadline</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="noticesTrackingBody">
+                                        <tr><td colspan="6" style="text-align:center; padding:20px;">Loading notices...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══════════════════════════════════ -->
+                <!-- View: Compliance Engine            -->
+                <!-- ═══════════════════════════════════ -->
+                <div id="view-compliance" class="view-pane hidden">
+                    <div class="view-header">
+                        <div>
+                            <h1>Compliance Engine</h1>
+                            <p class="subtitle">RBI & SARFAESI compliance tracking, violations, and audit log</p>
+                        </div>
+                        <div class="topbar-actions">
+                            <button class="btn btn-outline" style="margin-right: 12px;" onclick="exportReport()"><i class="fas fa-download"></i> Export</button>
+                            <button class="btn btn-primary" onclick="fetchComplianceData()"><i class="fas fa-sync"></i> Refresh</button>
+                        </div>
+                    </div>
+
+                    <div class="kpi-grid">
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon compliance-icon"><i class="fas fa-award"></i></div>
+                            <div class="kpi-content">
+                                <h3>Overall Compliance Score</h3>
+                                <div class="kpi-value" id="comp-kpi-score">--</div>
+                                <div class="kpi-trend positive"><i class="fas fa-check"></i> System Calculated</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon case-icon"><i class="fas fa-list-alt"></i></div>
+                            <div class="kpi-content">
+                                <h3>Total Compliance Items</h3>
+                                <div class="kpi-value" id="comp-kpi-total">--</div>
+                                <div class="kpi-trend neutral"><i class="fas fa-minus"></i> Tracked Items</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;"><i class="fas fa-exclamation-circle"></i></div>
+                            <div class="kpi-content">
+                                <h3>Open Violations</h3>
+                                <div class="kpi-value" id="comp-kpi-open">--</div>
+                                <div class="kpi-trend negative"><i class="fas fa-arrow-up"></i> Needs Remediation</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;"><i class="fas fa-radiation"></i></div>
+                            <div class="kpi-content">
+                                <h3>Critical Violations</h3>
+                                <div class="kpi-value" id="comp-kpi-critical">--</div>
+                                <div class="kpi-trend negative"><i class="fas fa-exclamation-triangle"></i> Immediate Action</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="charts-grid" style="grid-template-columns: 1fr 1fr; margin-bottom: 24px;">
+                        <div class="chart-card premium-glass">
+                            <h3>Compliance Score Gauge</h3>
+                            <div class="chart-container">
+                                <canvas id="complianceGaugeChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="queue-section premium-glass" style="padding: 24px;">
+                            <h3 style="margin-bottom: 16px;">Recent Audit Log</h3>
+                            <div id="auditLogList" class="audit-log-list">
+                                <div class="text-muted" style="text-align: center; padding: 20px;">Loading audit log...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="queue-section premium-glass">
+                        <div class="section-header-flex">
+                            <h3>Compliance Violations Register</h3>
+                            <button class="btn btn-sm btn-outline" onclick="fetchComplianceData()"><i class="fas fa-sync"></i> Refresh</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="enterprise-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Regulation</th>
+                                        <th>Description</th>
+                                        <th>Severity</th>
+                                        <th>Status</th>
+                                        <th>Due Date</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="complianceItemsBody">
+                                    <tr><td colspan="7" style="text-align:center; padding:20px;">Loading compliance items...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══════════════════════════════════ -->
+                <!-- View: Settings                     -->
+                <!-- ═══════════════════════════════════ -->
+                <div id="view-settings" class="view-pane hidden">
+                    <div class="view-header">
+                        <div>
+                            <h1>Settings & Configuration</h1>
+                            <p class="subtitle">Officer profile, system settings, and platform configuration</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-grid">
+                        <!-- Profile Card -->
+                        <div class="settings-card premium-glass">
+                            <div class="settings-card-header">
+                                <i class="fas fa-user-circle"></i>
+                                <h3>Officer Profile</h3>
+                            </div>
+                            <div class="settings-body">
+                                <div class="profile-avatar-section">
+                                    <div class="user-avatar large-avatar" id="settingsAvatar">AD</div>
+                                    <div>
+                                        <div class="kpi-value" style="font-size: 1.2rem;" id="settingsUserName">Admin User</div>
+                                        <div class="text-muted" id="settingsUserRole">Recovery Head</div>
+                                    </div>
+                                </div>
+                                <hr class="divider">
+                                <form id="profileForm">
+                                    <div class="form-group">
+                                        <label>Display Name</label>
+                                        <input type="text" id="profileName" class="form-control" placeholder="Your full name">
+                                    </div>
+                                    <div class="form-group" style="margin-top: 16px;">
+                                        <label>Current Password</label>
+                                        <input type="password" id="profileCurrentPwd" class="form-control" placeholder="Enter current password">
+                                    </div>
+                                    <div class="form-group" style="margin-top: 16px;">
+                                        <label>New Password</label>
+                                        <input type="password" id="profileNewPwd" class="form-control" placeholder="Enter new password (min 6 chars)">
+                                    </div>
+                                    <div id="profileMsg" class="error-msg" style="display:none;"></div>
+                                    <button type="submit" class="btn btn-primary" style="margin-top: 20px; width: 100%;"><i class="fas fa-save"></i> Update Profile</button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- System Info Card -->
+                        <div class="settings-card premium-glass">
+                            <div class="settings-card-header">
+                                <i class="fas fa-server"></i>
+                                <h3>System Information</h3>
+                            </div>
+                            <div class="settings-body" id="sysInfoBody">
+                                <div class="text-muted" style="text-align:center; padding:20px;">Loading system info...</div>
+                            </div>
+                        </div>
+
+                        <!-- API Configuration Card -->
+                        <div class="settings-card premium-glass">
+                            <div class="settings-card-header">
+                                <i class="fas fa-plug"></i>
+                                <h3>API Configuration</h3>
+                            </div>
+                            <div class="settings-body">
+                                <div class="form-group">
+                                    <label>Backend API URL</label>
+                                    <input type="text" id="apiBaseUrl" class="form-control" value="http://127.0.0.1:8000/api/v1/bank">
+                                </div>
+                                <div style="margin-top: 12px; display: flex; align-items: center; gap: 12px;">
+                                    <div id="apiStatusDot" class="status-dot"></div>
+                                    <span id="apiStatusText" class="text-muted">Checking connection...</span>
+                                </div>
+                                <button class="btn btn-outline" style="margin-top: 16px; width: 100%;" onclick="checkApiHealth()">
+                                    <i class="fas fa-heartbeat"></i> Test Connection
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Preferences Card -->
+                        <div class="settings-card premium-glass">
+                            <div class="settings-card-header">
+                                <i class="fas fa-sliders-h"></i>
+                                <h3>Preferences</h3>
+                            </div>
+                            <div class="settings-body">
+                                <div class="pref-item">
+                                    <div>
+                                        <div class="pref-label">Email Notifications</div>
+                                        <div class="text-muted text-sm">Receive alerts for new cases and deadlines</div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="prefEmailNotif" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="pref-item">
+                                    <div>
+                                        <div class="pref-label">Auto-refresh Dashboard</div>
+                                        <div class="text-muted text-sm">Refresh KPIs every 5 minutes</div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="prefAutoRefresh">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="pref-item">
+                                    <div>
+                                        <div class="pref-label">AI Copilot Suggestions</div>
+                                        <div class="text-muted text-sm">Show AI-generated strategy insights</div>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="prefAiCopilot" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <button class="btn btn-primary" style="margin-top: 20px; width: 100%;" onclick="savePreferences()">
+                                    <i class="fas fa-save"></i> Save Preferences
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- /viewContainer -->
+        </main>
+    </div><!-- /appContainer -->
+
+    <!-- ═══════════════════════════════════════════════ -->
+    <!-- Modals                                          -->
+    <!-- ═══════════════════════════════════════════════ -->
+
+    <!-- Draft Modal -->
     <div id="draftModal" class="overlay-screen" style="display: none; opacity: 0; background: rgba(15, 23, 42, 0.8);">
-        <div class="modal-container premium-glass" style="width: 700px; padding: 0; max-height: 90vh; display: flex; flex-direction: column;">
-            <div style="padding: 20px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin: 0; color: var(--accent-navy);">AI Draft Review</h3>
+        <div class="modal-container premium-glass">
+            <div class="modal-header">
+                <div>
+                    <h3>AI Draft Review</h3>
+                    <span class="text-muted text-sm" id="draftNoticeId"></span>
+                </div>
                 <button class="icon-btn" onclick="closeDraftModal()"><i class="fas fa-times"></i></button>
             </div>
-            <div style="padding: 24px; overflow-y: auto; flex: 1; background: #fff;">
-                <pre id="draftContent" style="white-space: pre-wrap; font-family: 'Courier New', Courier, monospace; font-size: 0.9rem; color: #333; line-height: 1.6;"></pre>
+            <div class="modal-body" style="background: #fff;">
+                <pre id="draftContent" class="draft-pre"></pre>
             </div>
-            <div style="padding: 20px 24px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px; background: var(--bg-secondary); border-radius: 0 0 12px 12px;">
-                <button class="btn btn-outline" onclick="closeDraftModal()">Discard</button>
-                <button class="btn btn-primary" onclick="closeDraftModal()">Approve & Dispatch</button>
+            <div class="modal-footer">
+                <div>
+                    <span class="text-muted text-sm">Deadline: <strong id="draftDeadline"></strong></span>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-outline" onclick="closeDraftModal()">Discard</button>
+                    <button class="btn btn-primary" onclick="approveAndDispatch()"><i class="fas fa-paper-plane"></i> Approve & Dispatch</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Case Detail Modal -->
+    <div id="caseDetailModal" class="overlay-screen" style="display: none; opacity: 0; background: rgba(15, 23, 42, 0.8);">
+        <div class="modal-container premium-glass" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3>Case Details</h3>
+                <button class="icon-btn" onclick="closeCaseModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="caseDetailBody" style="padding: 24px;">
+                <div class="text-muted">Loading...</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeCaseModal()">Close</button>
+                <button class="btn btn-primary" onclick="navigateTo('recovery')"><i class="fas fa-arrow-right"></i> Open in Recovery</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Assign Advocate Modal -->
+    <div id="assignModal" class="overlay-screen" style="display: none; opacity: 0; background: rgba(15, 23, 42, 0.8);">
+        <div class="modal-container premium-glass" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3>Assign Advocate</h3>
+                <button class="icon-btn" onclick="closeAssignModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <p class="text-muted" style="margin-bottom: 20px;">Assigning advocate to case: <strong id="assignCaseId"></strong></p>
+                <div class="form-group">
+                    <label>Select / Enter Advocate</label>
+                    <select class="form-control" id="advocateSelect" onchange="handleAdvocateSelect()">
+                        <option value="">-- Select from registered advocates --</option>
+                        <option value="Adv. Sharma">Adv. R.K. Sharma</option>
+                        <option value="Adv. Verma">Adv. P. Verma</option>
+                        <option value="Adv. Patel">Adv. S. Patel</option>
+                        <option value="Adv. Iyer">Adv. R. Iyer</option>
+                        <option value="Adv. Kapoor">Adv. A. Kapoor</option>
+                        <option value="Adv. Singh">Adv. B. Singh</option>
+                        <option value="Adv. Mehta">Adv. N. Mehta</option>
+                        <option value="__custom__">+ Enter custom name</option>
+                    </select>
+                </div>
+                <div class="form-group" id="customAdvocateGroup" style="margin-top: 12px; display: none;">
+                    <label>Custom Advocate Name</label>
+                    <input type="text" id="customAdvocateInput" class="form-control" placeholder="e.g. Adv. J. Doe">
+                </div>
+                <div id="assignError" class="error-msg" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeAssignModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmAssignAdvocate()"><i class="fas fa-check"></i> Assign</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Status Modal -->
+    <div id="statusModal" class="overlay-screen" style="display: none; opacity: 0; background: rgba(15, 23, 42, 0.8);">
+        <div class="modal-container premium-glass" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3>Update Case Status</h3>
+                <button class="icon-btn" onclick="closeStatusModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <p class="text-muted" style="margin-bottom: 20px;">Updating status for: <strong id="statusCaseId"></strong></p>
+                <div class="form-group">
+                    <label>New Status</label>
+                    <select class="form-control" id="statusSelect">
+                        <option value="Pending Review">Pending Review</option>
+                        <option value="Assigned">Assigned</option>
+                        <option value="Notice Served">Notice Served</option>
+                        <option value="Property Attached">Property Attached</option>
+                        <option value="DRT Filing">DRT Filing</option>
+                        <option value="Proposal Sent">Proposal Sent</option>
+                        <option value="Admitted">Admitted</option>
+                        <option value="Settled">Settled</option>
+                        <option value="Closed">Closed</option>
+                    </select>
+                </div>
+                <div id="statusError" class="error-msg" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeStatusModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmUpdateStatus()"><i class="fas fa-save"></i> Update Status</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Report Modal -->
+    <div id="exportModal" class="overlay-screen" style="display: none; opacity: 0; background: rgba(15, 23, 42, 0.8);">
+        <div class="modal-container premium-glass" style="max-width: 560px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-export"></i> Executive Summary Report</h3>
+                <button class="icon-btn" onclick="closeExportModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <div id="exportReportBody">
+                    <div class="text-muted" style="text-align:center; padding:30px;"><i class="fas fa-spinner fa-spin"></i> Generating report...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeExportModal()">Close</button>
+                <button class="btn btn-primary" onclick="downloadReport()"><i class="fas fa-download"></i> Download JSON</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Hearing Modal (Litigation) -->
+    <div id="hearingModal" class="overlay-screen" style="display: none; opacity: 0; background: rgba(15, 23, 42, 0.8);">
+        <div class="modal-container premium-glass" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3>Update Hearing Date</h3>
+                <button class="icon-btn" onclick="closeHearingModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <div class="form-group">
+                    <label>Case ID</label>
+                    <input type="text" id="hearingCaseId" class="form-control" placeholder="e.g. LIT-2023-0891">
+                </div>
+                <div class="form-group" style="margin-top: 16px;">
+                    <label>Next Hearing Date</label>
+                    <input type="date" id="hearingDate" class="form-control">
+                </div>
+                <div class="form-group" style="margin-top: 16px;">
+                    <label>Court Status</label>
+                    <select class="form-control" id="hearingStatus">
+                        <option>Under Examination</option>
+                        <option>Arguments Ongoing</option>
+                        <option>Summons Issued</option>
+                        <option>Admission Hearing</option>
+                        <option>Listed</option>
+                        <option>Judgment Reserved</option>
+                        <option>Disposed Off</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeHearingModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="confirmUpdateHearing()"><i class="fas fa-calendar-check"></i> Update</button>
             </div>
         </div>
     </div>
