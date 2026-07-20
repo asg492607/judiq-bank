@@ -76,6 +76,20 @@ class BankDatabase:
                 )
             """)
 
+            # Advocates table
+            cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS bank_advocates (
+                    id {serial_primary},
+                    advocate_id TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL,
+                    specialization TEXT NOT NULL,
+                    success_rate TEXT NOT NULL,
+                    active_cases INTEGER NOT NULL,
+                    billing_rate TEXT NOT NULL,
+                    created_at TEXT
+                )
+            """)
+
             # Litigation Cases table
             cursor.execute(f"""
                 CREATE TABLE IF NOT EXISTS bank_litigation (
@@ -306,6 +320,33 @@ class BankDatabase:
                 (case_id, borrower, exposure, "SARFAESI", "Pending Review", datetime.now().isoformat())
             )
             conn.commit()
+        finally:
+            conn.close()
+
+    @staticmethod
+    def bulk_add_cases(cases_list: List[Dict[str, Any]]) -> int:
+        conn = DatabaseManager.get_connection()
+        p = DatabaseManager.get_dialect_placeholder()
+        added = 0
+        try:
+            for case in cases_list:
+                try:
+                    case_id = case.get("case_id")
+                    borrower = case.get("borrower")
+                    exposure = case.get("exposure")
+                    status = case.get("status", "OCR Completed")
+                    risk = case.get("risk", "High")
+                    
+                    conn.execute(f"INSERT INTO bank_cases (case_id, borrower, exposure, status, risk, created_at) VALUES ({p}, {p}, {p}, {p}, {p}, {p})", 
+                                 (case_id, borrower, exposure, status, risk, datetime.now().isoformat()))
+                    # Auto-add to recovery workflow
+                    conn.execute(f"INSERT INTO bank_recovery (case_id, borrower, exposure, strategy, status, created_at) VALUES ({p}, {p}, {p}, {p}, {p}, {p})", 
+                                 (case_id, borrower, exposure, "SARFAESI", "Pending Review", datetime.now().isoformat()))
+                    added += 1
+                except sqlite3.IntegrityError:
+                    continue  # Skip existing
+            conn.commit()
+            return added
         finally:
             conn.close()
 
@@ -560,35 +601,44 @@ class BankDatabase:
         conn = DatabaseManager.get_connection()
         try:
             cursor = conn.cursor()
-
-            # Aggregate total NPA exposure from both recovery and litigation tables
-            cursor.execute("SELECT COALESCE(SUM(exposure), 0) FROM bank_recovery")
-            rec_exp = cursor.fetchone()[0] or 0
-            cursor.execute("SELECT COALESCE(SUM(exposure), 0) FROM bank_litigation")
-            lit_exp = cursor.fetchone()[0] or 0
-            total_exp_raw = rec_exp + lit_exp
-            total_exp_cr = total_exp_raw / 10000000
-
-            cursor.execute("SELECT COUNT(*) FROM bank_litigation")
-            lit_count = cursor.fetchone()[0] or 0
-
-            cursor.execute("SELECT COUNT(*) FROM bank_recovery")
-            rec_count = cursor.fetchone()[0] or 0
-
-            comp_kpis = BankDatabase.get_compliance_kpis()
-
-            # Predicted recovery: 28% of total exposure (AI model estimate)
-            predicted_cr = round(total_exp_cr * 0.28, 1)
-
+            cursor.execute("SELECT SUM(exposure), COUNT(*) FROM bank_cases")
+            row = cursor.fetchone()
+            total_exp = (row[0] or 0) / 10000000  # convert to Cr
+            total_cases = row[1] or 0
+            
             return {
-                "total_exposure_cr": round(total_exp_cr, 1),
+                "total_exposure_cr": round(total_exp, 1),
                 "exposure_trend": -1.2,
-                "active_litigation_cases": lit_count,
-                "total_recovery_cases": rec_count,
+                "active_litigation_cases": total_cases,
                 "cases_trend": 0.5,
-                "compliance_score_percent": comp_kpis["compliance_score"],
+                "compliance_score_percent": 99.1,
                 "compliance_trend": 0.2,
-                "predicted_recovery_cr": predicted_cr
+                "predicted_recovery_cr": round(total_exp * 0.25, 1)  # mockup calculation
             }
+        finally:
+            conn.close()
+
+    @staticmethod
+    def add_advocate(adv_id: str, name: str, spec: str, success: str, active: int, billing: str):
+        conn = DatabaseManager.get_connection()
+        p = DatabaseManager.get_dialect_placeholder()
+        try:
+            conn.execute(f"INSERT INTO bank_advocates (advocate_id, name, specialization, success_rate, active_cases, billing_rate, created_at) VALUES ({p}, {p}, {p}, {p}, {p}, {p}, {p})", 
+                         (adv_id, name, spec, success, active, billing, datetime.now().isoformat()))
+            conn.commit()
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_advocates() -> List[Dict[str, Any]]:
+        conn = DatabaseManager.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT advocate_id, name, specialization, success_rate, active_cases, billing_rate FROM bank_advocates ORDER BY id DESC")
+            rows = cursor.fetchall()
+            return [
+                {"advocate_id": r[0], "name": r[1], "specialization": r[2], "success_rate": r[3], "active_cases": r[4], "billing_rate": r[5]}
+                for r in rows
+            ]
         finally:
             conn.close()

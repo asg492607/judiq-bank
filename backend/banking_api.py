@@ -542,3 +542,91 @@ async def get_portfolio_intelligence(current_user: str = Depends(get_current_use
         "regions": ["North", "South", "East", "West"],
         "npa_distribution": [1200, 850, 600, 1600]
     }
+
+import pandas as pd
+from fastapi.responses import StreamingResponse
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+import io
+
+@router.post("/cases/bulk-upload", summary="Bulk Upload Cases via Excel/CSV")
+async def bulk_upload_cases(file: UploadFile = File(...)):
+    contents = await file.read()
+    if file.filename.endswith('.csv'):
+        df = pd.read_csv(io.BytesIO(contents))
+    elif file.filename.endswith(('.xls', '.xlsx')):
+        df = pd.read_excel(io.BytesIO(contents))
+    else:
+        raise HTTPException(status_code=400, detail="Invalid file format. Use CSV or Excel.")
+    
+    cases_list = []
+    for _, row in df.iterrows():
+        cases_list.append({
+            "case_id": str(row.get("case_id", f"CASE-{str(uuid.uuid4())[:8].upper()}")),
+            "borrower": str(row.get("borrower", "Unknown")),
+            "exposure": float(row.get("exposure", 0.0)),
+            "status": str(row.get("status", "OCR Completed")),
+            "risk": str(row.get("risk", "High"))
+        })
+        
+    added = BankDatabase.bulk_add_cases(cases_list)
+    return {"success": True, "message": f"Successfully processed and added {added} cases."}
+
+@router.get("/notices/export/pdf", summary="Export Notices to PDF")
+async def export_notices_pdf():
+    notices = BankDatabase.get_notices()
+    
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, height - 50, "JudiQ Bank Edition - Legal Notices Report")
+    
+    c.setFont("Helvetica", 10)
+    y = height - 80
+    
+    for notice in notices:
+        if y < 50:
+            c.showPage()
+            c.setFont("Helvetica", 10)
+            y = height - 50
+            
+        c.drawString(50, y, f"Notice ID: {notice['notice_id']} | Borrower: {notice['borrower']}")
+        c.drawString(50, y - 15, f"Type: {notice['type']} | Status: {notice['status']} | Deadline: {notice['deadline']}")
+        y -= 40
+        
+    c.save()
+    buffer.seek(0)
+    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=notices_report.pdf"})
+
+@router.get("/recovery/export/excel", summary="Export Recovery Cases to Excel")
+async def export_recovery_excel():
+    cases = BankDatabase.get_recovery_cases()
+    df = pd.DataFrame(cases)
+    
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Recovery Cases')
+        
+    buffer.seek(0)
+    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": "attachment; filename=recovery_cases.xlsx"})
+
+class AddAdvocateRequest(BaseModel):
+    name: str
+    specialization: str
+    success_rate: str
+    active_cases: int
+    billing_rate: str
+
+@router.post("/advocates/add", summary="Onboard New Advocate", tags=["Advocates"])
+async def onboard_advocate(req: AddAdvocateRequest, current_user: str = Depends(get_current_user)):
+    adv_id = f"ADV-{str(uuid.uuid4())[:6].upper()}"
+    BankDatabase.add_advocate(adv_id, req.name, req.specialization, req.success_rate, req.active_cases, req.billing_rate)
+    return {"success": True, "message": f"Successfully onboarded {req.name}"}
+
+@router.get("/advocates", summary="Get Advocate Directory", tags=["Advocates"])
+async def get_advocates(current_user: str = Depends(get_current_user)):
+    advocates = BankDatabase.get_advocates()
+    return {"success": True, "advocates": advocates}
+

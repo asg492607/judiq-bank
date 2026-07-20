@@ -274,6 +274,7 @@ function navigateTo(view) {
     if (view === 'settings') { loadSystemInfo(); checkApiHealth(); }
     if (view === 'notices') fetchNotices();
     if (view === 'recovery') fetchRecoveryCases();
+    if (view === 'advocates') fetchAdvocates();
 }
 
 // ══════════════════════════════════════
@@ -1480,3 +1481,107 @@ document.addEventListener('click', (e) => {
         panel.classList.add('hidden');
     }
 });
+
+// ─────────────────────────────────────────────
+// Advocates Management (Phase 9) & Bulk I/O (Phase 8)
+// ─────────────────────────────────────────────
+
+// Bulk Upload Logic
+const bulkInput = document.getElementById('bulkFileInput');
+if (bulkInput) {
+    bulkInput.addEventListener('change', async (e) => {
+        if (!e.target.files.length) return;
+        const file = e.target.files[0];
+        const formData = new FormData();
+        formData.append("file", file);
+        
+        try {
+            const res = await apiFetch('/cases/bulk-upload', {
+                method: 'POST',
+                body: formData
+            }, true);
+            alert(res.message || "Bulk upload successful!");
+            fetchRecentCases();
+            fetchRecoveryCases();
+            fetchDashboardData();
+        } catch (error) {
+            console.error("Bulk upload failed", error);
+            alert("Failed to upload bulk cases.");
+        }
+    });
+}
+
+async function exportNoticesPdf() {
+    window.open(`${API_BASE_URL}/api/v1/bank/notices/export/pdf`, '_blank');
+}
+
+async function exportRecoveryExcel() {
+    window.open(`${API_BASE_URL}/api/v1/bank/recovery/export/excel`, '_blank');
+}
+
+
+async function fetchAdvocates() {
+    try {
+        const res = await apiFetch('/advocates');
+        if (res && res.advocates) {
+            document.getElementById('adv-total-count').textContent = res.advocates.length;
+            const tbody = document.getElementById('advocatesTableBody');
+            tbody.innerHTML = '';
+            if (res.advocates.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">No advocates found</td></tr>';
+                return;
+            }
+            res.advocates.forEach(adv => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${adv.advocate_id}</strong></td>
+                    <td>${adv.name}</td>
+                    <td><span class="badge ${adv.specialization.includes('SARFAESI') ? 'badge-danger' : 'badge-warning'}">${adv.specialization}</span></td>
+                    <td>${adv.success_rate}</td>
+                    <td>${adv.active_cases}</td>
+                    <td>${adv.billing_rate}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    } catch (e) {
+        console.error("Error fetching advocates:", e);
+    }
+}
+
+function openAdvocateModal() {
+    document.getElementById('advocateModal').classList.remove('hidden');
+}
+
+function closeAdvocateModal() {
+    document.getElementById('advocateModal').classList.add('hidden');
+    document.getElementById('advocateForm').reset();
+}
+
+const advForm = document.getElementById('advocateForm');
+if (advForm) {
+    advForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const data = {
+            name: document.getElementById('advName').value,
+            specialization: document.getElementById('advSpec').value,
+            success_rate: document.getElementById('advSuccess').value,
+            active_cases: 0,
+            billing_rate: document.getElementById('advBilling').value
+        };
+        try {
+            const res = await apiFetch('/advocates/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            alert(res.message || "Advocate onboarded!");
+            closeAdvocateModal();
+            fetchAdvocates();
+        } catch (error) {
+            console.error(error);
+            alert("Failed to onboard advocate");
+        }
+    });
+}
+

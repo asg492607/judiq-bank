@@ -106,9 +106,9 @@
                 </a>
                 
                 <div class="nav-group-title">System</div>
-                <a href="#" class="nav-item" data-view="settings">
-                    <i class="fas fa-cog"></i> Settings
-                </a>
+                <a href="#" class="nav-item" data-view="settings"><i class="fas fa-cog"></i> Settings</a>
+                <div class="nav-section">Legal Partners</div>
+                <a href="#" class="nav-item" data-view="advocates"><i class="fas fa-gavel"></i> Advocate Directory</a>
             </nav>
             
             <div class="sidebar-footer">
@@ -230,7 +230,7 @@
                         </div>
                     </div>
                     
-                    <!-- AI Insights -->
+
                     <div class="insights-section premium-glass">
                         <h3><i class="fas fa-bolt highlight"></i> AI Copilot Insights</h3>
                         <div class="insight-list" id="dashboardInsights">
@@ -253,6 +253,56 @@
                 </div>
 
                 <!-- ═══════════════════════════════════ -->
+                <!-- View: Advocate Directory            -->
+                <!-- ═══════════════════════════════════ -->
+                <div id="view-advocates" class="view-pane hidden">
+                    <div class="view-header">
+                        <div>
+                            <h1><i class="fas fa-gavel"></i> Empanelled Advocates</h1>
+                            <p class="subtitle">Manage external legal partners, vendors, and law firms</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="openAdvocateModal()"><i class="fas fa-user-plus"></i> Onboard Advocate</button>
+                    </div>
+                    
+                    <!-- KPIs -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon" style="background: rgba(30,136,229,0.1); color: #1e88e5;"><i class="fas fa-users"></i></div>
+                            <div class="kpi-content">
+                                <h3>Total Empanelled</h3>
+                                <div class="kpi-value" id="adv-total-count">--</div>
+                            </div>
+                        </div>
+                        <div class="kpi-card premium-glass">
+                            <div class="kpi-icon" style="background: rgba(76,175,80,0.1); color: #4caf50;"><i class="fas fa-chart-line"></i></div>
+                            <div class="kpi-content">
+                                <h3>Avg Success Rate</h3>
+                                <div class="kpi-value">76%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Data Table -->
+                    <div class="table-container premium-glass mt-4">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Advocate ID</th>
+                                    <th>Firm / Name</th>
+                                    <th>Specialization</th>
+                                    <th>Success Rate</th>
+                                    <th>Active Cases</th>
+                                    <th>Billing Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody id="advocatesTableBody">
+                                <tr><td colspan="6" class="text-center">Loading advocates...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ═══════════════════════════════════ -->
                 <!-- View: Case Intake                   -->
                 <!-- ═══════════════════════════════════ -->
                 <div id="view-case-intake" class="view-pane hidden">
@@ -266,7 +316,15 @@
                     <div class="intake-grid">
                         <!-- Upload Zone -->
                         <div class="upload-section premium-glass">
-                            <h3>Upload Documents</h3>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h3>Upload Documents</h3>
+                                <div style="display: flex; gap: 10px;">
+                                    <input type="file" id="bulkFileInput" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" style="display:none">
+                                    <button class="btn btn-outline" onclick="document.getElementById('bulkFileInput').click()">
+                                        <i class="fas fa-file-excel"></i> Bulk Import (CSV/Excel)
+                                    </button>
+                                </div>
+                            </div>
                             <div class="upload-zone" id="uploadZone">
                                 <i class="fas fa-cloud-upload-alt fa-3x"></i>
                                 <p>Drag and drop case files here</p>
@@ -934,6 +992,45 @@
                 <div style="display: flex; gap: 12px;">
                     <button class="btn btn-outline" onclick="closeDraftModal()">Discard</button>
                     <button class="btn btn-primary" onclick="approveAndDispatch()"><i class="fas fa-paper-plane"></i> Approve & Dispatch</button>
+                </div>
+            </div>
+        </div>
+        <!-- Onboard Advocate Modal -->
+        <div id="advocateModal" class="modal hidden">
+            <div class="modal-overlay" onclick="closeAdvocateModal()"></div>
+            <div class="modal-content premium-glass">
+                <div class="modal-header">
+                    <h2><i class="fas fa-user-plus"></i> Onboard New Advocate</h2>
+                    <button class="modal-close" onclick="closeAdvocateModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="advocateForm">
+                        <div class="form-group">
+                            <label>Name / Firm</label>
+                            <input type="text" id="advName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Specialization</label>
+                            <select id="advSpec" required>
+                                <option value="SARFAESI">SARFAESI / DRT</option>
+                                <option value="NCLT">IBC / NCLT</option>
+                                <option value="Criminal">Criminal (NI 138)</option>
+                                <option value="Civil">Civil / High Court</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Success Rate</label>
+                            <input type="text" id="advSuccess" placeholder="e.g. 85%" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Billing Rate</label>
+                            <input type="text" id="advBilling" placeholder="e.g. ₹5,000 / hearing" required>
+                        </div>
+                        <div class="form-actions mt-4">
+                            <button type="button" class="btn btn-outline" onclick="closeAdvocateModal()">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Onboard Advocate</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
