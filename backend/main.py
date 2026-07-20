@@ -9,11 +9,9 @@ from session import DatabaseManager
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from limiter import limiter
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger("JudiQ.Main")
+from logger import get_logger
+
+logger = get_logger()
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,

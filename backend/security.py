@@ -99,6 +99,36 @@ def get_current_user_optional(credentials: HTTPAuthorizationCredentials = Depend
         if payload and "sub" in payload:
             return payload["sub"]
     return "ANONYMOUS"
+
+def require_role(required_role: str):
+    def role_dependency(credentials: HTTPAuthorizationCredentials = Depends(security_scheme)) -> str:
+        if not credentials:
+            raise HTTPException(status_code=401, detail="Missing Authentication Token")
+        payload = SecurityManager.verify_token(credentials.credentials)
+        if not payload or "sub" not in payload:
+            raise HTTPException(status_code=401, detail="Invalid or Expired Token")
+        
+        user_role = payload.get("role", "Officer")
+        # Allow Admin to access everything, else exact match
+        if user_role != "Admin" and user_role != required_role:
+            raise HTTPException(status_code=403, detail=f"Insufficient permissions. Requires {required_role} role.")
+        return payload["sub"]
+    return role_dependency
+
+from fastapi.security import APIKeyHeader
+
+api_key_header = APIKeyHeader(name="X-CBS-API-KEY", auto_error=False)
+
+def verify_cbs_api_key(api_key_header: str = Depends(api_key_header)) -> bool:
+    if not api_key_header:
+        raise HTTPException(status_code=401, detail="Missing API Key")
+    # In a real enterprise system, this should query a secure vault or database.
+    # For now, we compare against an environment variable or default hardcoded string.
+    expected_api_key = os.getenv("CBS_API_KEY", "judiq-cbs-integration-secret-key-2026")
+    if api_key_header != expected_api_key:
+        raise HTTPException(status_code=403, detail="Invalid API Key")
+    return True
+
 class SecurityTelemetry:
     @staticmethod
     def audit_payload(payload: dict) -> list:

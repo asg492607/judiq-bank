@@ -513,18 +513,27 @@ function simulateUploadAndOCR(file) {
     }, 250);
 }
 
-async function fetchRecentCases() {
+let currentCasesPage = 0;
+const casesPerPage = 50;
+
+async function fetchRecentCases(page = 0) {
+    currentCasesPage = page;
     const tbody = document.getElementById('recentCasesBody');
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:16px;"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
 
     try {
-        const res = await apiFetch('/cases/recent');
+        const offset = page * casesPerPage;
+        const res = await apiFetch(`/cases/recent?limit=${casesPerPage}&offset=${offset}`);
         const data = await res.json();
         tbody.innerHTML = '';
 
         if (!data.cases || data.cases.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">No cases yet. Upload a document to begin.</td></tr>';
+            if (page === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">No cases yet. Upload a document to begin.</td></tr>';
+            } else {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:#94a3b8;">No more cases found.</td></tr>';
+            }
             return;
         }
 
@@ -544,9 +553,21 @@ async function fetchRecentCases() {
             `;
             tbody.appendChild(tr);
         });
+        
+        updatePaginationControls('casesPagination', page, data.cases.length === casesPerPage);
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#ef4444;">Failed to load cases. Is the backend running?</td></tr>`;
     }
+}
+
+function updatePaginationControls(containerId, page, hasMore) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = `
+        <button class="btn btn-sm btn-outline" onclick="fetchRecentCases(${page - 1})" ${page === 0 ? 'disabled' : ''}>Previous</button>
+        <span style="padding: 0 10px; font-size: 0.9rem;">Page ${page + 1}</span>
+        <button class="btn btn-sm btn-outline" onclick="fetchRecentCases(${page + 1})" ${!hasMore ? 'disabled' : ''}>Next</button>
+    `;
 }
 
 function openCaseDetail(caseId) {
@@ -1585,3 +1606,45 @@ if (advForm) {
     });
 }
 
+
+
+// ══════════════════════════════════════
+// Feedback
+// ══════════════════════════════════════
+function initFeedbackForm() {
+    const form = document.getElementById('feedbackForm');
+    if (!form) return;
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('feedbackSubmitBtn');
+        const type = document.getElementById('feedbackType').value;
+        const message = document.getElementById('feedbackMessage').value;
+
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+        btn.disabled = true;
+
+        try {
+            const res = await apiFetch('/feedback', {
+                method: 'POST',
+                body: JSON.stringify({ type, message })
+            });
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message, 'success');
+                document.getElementById('feedbackModal').style.display = 'none';
+                form.reset();
+            } else {
+                showToast(data.detail || 'Failed to submit feedback', 'error');
+            }
+        } catch (err) {
+            showToast('Server error during feedback submission.', 'error');
+        } finally {
+            btn.innerHTML = 'Submit';
+            btn.disabled = false;
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initFeedbackForm();
+});

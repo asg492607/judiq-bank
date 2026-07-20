@@ -5,7 +5,7 @@ import time
 import asyncio
 import uuid
 from datetime import datetime, timedelta
-from security import SecurityManager, get_current_user
+from security import SecurityManager, get_current_user, require_role, verify_cbs_api_key
 from bank_db import BankDatabase
 
 router = APIRouter()
@@ -151,9 +151,13 @@ async def upload_case_documents(
 
 
 @router.get("/cases/recent", summary="Get Recent Intake Cases", tags=["Case Intake"])
-async def get_recent_cases(current_user: str = Depends(get_current_user)):
-    cases = BankDatabase.get_cases()
-    return {"success": True, "cases": cases}
+async def get_recent_cases(
+    limit: int = Query(50, description="Max number of cases to return"),
+    offset: int = Query(0, description="Number of cases to skip"),
+    current_user: str = Depends(get_current_user)
+):
+    cases = BankDatabase.get_cases(limit=limit, offset=offset)
+    return {"success": True, "cases": cases, "limit": limit, "offset": offset}
 
 
 @router.get("/cases/{case_id}", summary="Get Single Case Details", tags=["Case Intake"])
@@ -620,7 +624,7 @@ class AddAdvocateRequest(BaseModel):
     billing_rate: str
 
 @router.post("/advocates/add", summary="Onboard New Advocate", tags=["Advocates"])
-async def onboard_advocate(req: AddAdvocateRequest, current_user: str = Depends(get_current_user)):
+async def onboard_advocate(req: AddAdvocateRequest, current_user: str = Depends(require_role("Recovery Head"))):
     adv_id = f"ADV-{str(uuid.uuid4())[:6].upper()}"
     BankDatabase.add_advocate(adv_id, req.name, req.specialization, req.success_rate, req.active_cases, req.billing_rate)
     return {"success": True, "message": f"Successfully onboarded {req.name}"}
@@ -630,3 +634,127 @@ async def get_advocates(current_user: str = Depends(get_current_user)):
     advocates = BankDatabase.get_advocates()
     return {"success": True, "advocates": advocates}
 
+# ─────────────────────────────────────────────
+# Settings / Configuration Endpoints
+# ─────────────────────────────────────────────
+
+@router.get("/settings", summary="Get Bank Configurations", tags=["Settings"])
+async def get_settings(current_user: str = Depends(get_current_user)):
+    configs = BankDatabase.get_configurations()
+    return {"success": True, "settings": configs}
+
+class UpdateSettingRequest(BaseModel):
+    key: str
+    value: str
+
+@router.post("/settings/update", summary="Update Bank Configuration", tags=["Settings"])
+async def update_setting(req: UpdateSettingRequest, current_user: str = Depends(require_role("Admin"))):
+    BankDatabase.update_configuration(req.key, req.value)
+    return {"success": True, "message": f"Setting {req.key} updated successfully."}
+
+# ─────────────────────────────────────────────
+# CBS (Core Banking System) Integration Endpoints
+# ─────────────────────────────────────────────
+
+class CBSCasePayload(BaseModel):
+    account_number: str
+    borrower_name: str
+    outstanding_balance: float
+    days_past_due: int
+    asset_classification: str
+    region: Optional[str] = "Unknown"
+
+class CBSIngestRequest(BaseModel):
+    batch_id: str
+    timestamp: str
+    records: List[CBSCasePayload]
+
+@router.post("/cbs/ingest", summary="Ingest NPA Accounts from CBS", tags=["Integration"])
+async def ingest_cbs_data(req: CBSIngestRequest, api_key_valid: bool = Depends(verify_cbs_api_key)):
+    cases_list = []
+    for record in req.records:
+        risk = "Low"
+        if record.days_past_due > 90:
+            risk = "High"
+        if record.days_past_due > 180:
+            risk = "Critical"
+            
+        cases_list.append({
+            "case_id": record.account_number,
+            "borrower": record.borrower_name,
+            "exposure": record.outstanding_balance,
+            "status": "Newly Ingested",
+            "risk": risk
+        })
+    
+    added_count = BankDatabase.bulk_add_cases(cases_list)
+    
+    conn = BankDatabase.get_connection()
+    try:
+        p = BankDatabase.get_dialect_placeholder()
+        conn.execute(
+            f"INSERT INTO bank_notifications (title, message, type, created_at) VALUES ({p}, {p}, {p}, {p})",
+            (f"CBS Batch {req.batch_id} Processed", f"Successfully ingested {added_count} NPA accounts from Core Banking System.", "success", datetime.now().isoformat())
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    finally:
+        conn.close()
+    
+    return {
+        "success": True,
+        "message": f"Batch {req.batch_id} processed. {added_count} accounts imported.",
+        "records_received": len(req.records),
+        "records_imported": added_count
+    }
+
+# ─────────────────────────────────────────────
+# Backup & Restore Endpoints
+# ─────────────────────────────────────────────
+from fastapi.responses import FileResponse
+import shutil
+
+@router.get("/admin/backup", summary="Download Database Backup", tags=["Admin"])
+async def download_backup(current_user: str = Depends(require_role("Admin"))):
+    db_path = "bank_data.db"
+    backup_path = "bank_data_backup.db"
+    if os.path.exists(db_path):
+        shutil.copy2(db_path, backup_path)
+        return FileResponse(backup_path, filename=f"judiq_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db")
+    raise HTTPException(status_code=404, detail="Database not found")
+
+@router.post("/admin/restore", summary="Restore Database Backup", tags=["Admin"])
+async def restore_backup(file: UploadFile = File(...), current_user: str = Depends(require_role("Admin"))):
+    db_path = "bank_data.db"
+    contents = await file.read()
+    with open(db_path, "wb") as f:
+        f.write(contents)
+    return {"success": True, "message": "Database successfully restored. A restart may be required."}
+
+# ─────────────────────────────────────────────
+# Customer Validation / Feedback Endpoint
+# ─────────────────────────────────────────────
+class FeedbackRequest(BaseModel):
+    type: str
+    message: str
+
+@router.post("/feedback", summary="Submit User Feedback", tags=["Feedback"])
+async def submit_feedback(req: FeedbackRequest, current_user: str = Depends(get_current_user)):
+    conn = BankDatabase.get_connection()
+    try:
+        p = BankDatabase.get_dialect_placeholder()
+        conn.execute(
+            f"CREATE TABLE IF NOT EXISTS bank_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, user TEXT, type TEXT, message TEXT, created_at TEXT)"
+        )
+        conn.execute(
+            f"INSERT INTO bank_feedback (user, type, message, created_at) VALUES ({p}, {p}, {p}, {p})",
+            (current_user, req.type, req.message, datetime.now().isoformat())
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save feedback.")
+    finally:
+        conn.close()
+    return {"success": True, "message": "Thank you for your feedback!"}

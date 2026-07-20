@@ -5,8 +5,15 @@ from datetime import datetime, timedelta
 from session import DatabaseManager
 
 
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 def _hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+    return pwd_context.hash(password)
+
+def _verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 class BankDatabase:
@@ -132,6 +139,16 @@ class BankDatabase:
                 )
             """)
 
+            # Configurations table
+            cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS bank_configurations (
+                    id {serial_primary},
+                    key TEXT UNIQUE NOT NULL,
+                    value TEXT NOT NULL,
+                    updated_at TEXT
+                )
+            """)
+
             conn.commit()
 
             # Seed default admin
@@ -254,6 +271,22 @@ class BankDatabase:
                 )
             conn.commit()
 
+        # Seed configurations
+        cursor.execute("SELECT COUNT(*) FROM bank_configurations")
+        if cursor.fetchone()[0] == 0:
+            configs = [
+                ("SARFAESI_NOTICE_DAYS", "60"),
+                ("RISK_SCORE_THRESHOLD_HIGH", "80"),
+                ("RISK_SCORE_THRESHOLD_CRITICAL", "95"),
+                ("AUTO_ASSIGN_ADVOCATE", "true")
+            ]
+            for key, val in configs:
+                conn.execute(
+                    f"INSERT INTO bank_configurations (key, value, updated_at) VALUES ({p},{p},{p})",
+                    (key, val, datetime.now().isoformat())
+                )
+            conn.commit()
+
     @staticmethod
     def create_officer(name: str, email: str, password: str) -> bool:
         conn = DatabaseManager.get_connection()
@@ -276,15 +309,16 @@ class BankDatabase:
         conn = DatabaseManager.get_connection()
         p = DatabaseManager.get_dialect_placeholder()
         try:
-            hashed = _hash_password(password)
             cursor = conn.cursor()
             cursor.execute(
-                f"SELECT id, name, email, role FROM bank_officers WHERE email = {p} AND password = {p}",
-                (username, hashed)
+                f"SELECT id, name, email, role, password FROM bank_officers WHERE email = {p}",
+                (username,)
             )
             row = cursor.fetchone()
             if row:
-                return {"id": row[0], "name": row[1], "email": row[2], "role": row[3]}
+                stored_hash = row[4]
+                if _verify_password(password, stored_hash):
+                    return {"id": row[0], "name": row[1], "email": row[2], "role": row[3]}
             return None
         finally:
             conn.close()
@@ -347,15 +381,18 @@ class BankDatabase:
                     continue  # Skip existing
             conn.commit()
             return added
+        except Exception as e:
+            conn.rollback()
+            raise e
         finally:
             conn.close()
 
     @staticmethod
-    def get_cases() -> List[Dict[str, Any]]:
+    def get_cases(limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
         conn = DatabaseManager.get_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT case_id, borrower, exposure, status, risk FROM bank_cases ORDER BY id DESC")
+            cursor.execute("SELECT case_id, borrower, exposure, status, risk FROM bank_cases ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset))
             rows = cursor.fetchall()
             return [
                 {
@@ -640,5 +677,29 @@ class BankDatabase:
                 {"advocate_id": r[0], "name": r[1], "specialization": r[2], "success_rate": r[3], "active_cases": r[4], "billing_rate": r[5]}
                 for r in rows
             ]
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_configurations() -> Dict[str, str]:
+        conn = DatabaseManager.get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT key, value FROM bank_configurations")
+            rows = cursor.fetchall()
+            return {r[0]: r[1] for r in rows}
+        finally:
+            conn.close()
+
+    @staticmethod
+    def update_configuration(key: str, value: str):
+        conn = DatabaseManager.get_connection()
+        p = DatabaseManager.get_dialect_placeholder()
+        try:
+            # SQLite does not support INSERT OR REPLACE in all contexts if not using unique key correctly,
+            # but since key is UNIQUE, we can use INSERT OR REPLACE.
+            conn.execute(f"INSERT OR REPLACE INTO bank_configurations (id, key, value, updated_at) VALUES ((SELECT id FROM bank_configurations WHERE key = {p}), {p}, {p}, {p})", 
+                         (key, key, value, datetime.now().isoformat()))
+            conn.commit()
         finally:
             conn.close()
